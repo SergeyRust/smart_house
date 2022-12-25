@@ -1,0 +1,7 @@
+[package]
+name = "smart_house_examples"
+version = "0.0.1"
+authors = ["Sergey Petukhov"]
+
+[dependencies]
+smart_house = { path = "smart_house" }
