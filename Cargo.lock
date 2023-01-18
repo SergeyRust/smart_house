@@ -3,5 +3,9 @@
 version = 3
 
 [[package]]
-name = "CleverHouse"
+name = "clever-house"
 version = "0.1.0"
+
+[[package]]
+name = "examples"
+version = "0.0.1"
