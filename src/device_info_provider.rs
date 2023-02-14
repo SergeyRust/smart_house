@@ -1,6 +1,6 @@
-use crate::errors;
 use crate::errors::{DEVICE_ERROR, ROOM_ERROR, SmartHouseError};
 use crate::errors::InnerError;
+use rand::Rng;
 
 pub trait DeviceInfoProvider {
     // todo: метод, возвращающий состояние устройства по имени комнаты и имени устройства
@@ -9,20 +9,37 @@ pub trait DeviceInfoProvider {
 }
 
 
-pub trait Device {
+pub trait Device : Send + Sync {
     fn get_name(&self) -> &str;
     fn set_name(&mut self, name: &str);
+    fn get_consumed_power(&mut self, name: &str) -> f32;
+    fn switch_on_off(&mut self, state: bool);
 }
 
 // Пользовательские устройства:
-
 pub struct SmartSocket {
+    pub(crate) is_on: bool,
     pub name : String
 }
 
 pub struct SmartThermometer {
+    pub(crate) is_on: bool,
     pub name : String
 }
+
+// impl <'a> Deref for SmartSocket {
+//     type Target = (bool, &'a str);
+//
+//     fn deref(&'a self) -> &Self::Target {
+//          &(self.is_on, &self.name)
+//     }
+// }
+//
+// impl DerefMut for SmartSocket {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut (self.is_on, &self.name)
+//     }
+// }
 
 impl Device for SmartSocket {
 
@@ -33,7 +50,29 @@ impl Device for SmartSocket {
     fn set_name(&mut self, name: &str) {
         self.name = String::from(name);
     }
+
+    fn get_consumed_power(&mut self, name: &str) -> f32 {
+        rand::thread_rng().gen_range(5..10) as f32 // TODO float point
+    }
+
+    fn switch_on_off(&mut self, is_on: bool) {
+        self.is_on = is_on;
+    }
 }
+
+// impl <'a> Deref for SmartThermometer {
+//     type Target =  (bool, &'a str);
+//
+//     fn deref(&'a self) -> &Self::Target {
+//         &(self.is_on, &self.name)
+//     }
+// }
+
+// impl DerefMut for SmartThermometer {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut (self.is_on, &self.name)
+//     }
+// }
 
 impl Device for SmartThermometer {
 
@@ -43,6 +82,14 @@ impl Device for SmartThermometer {
 
     fn set_name(&mut self, name: &str) {
         self.name = String::from(name);
+    }
+
+    fn get_consumed_power(&mut self, name: &str) -> f32 {
+        todo!()
+    }
+
+    fn switch_on_off(&mut self, state: bool) {
+        self.is_on = state;
     }
 }
 

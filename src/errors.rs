@@ -1,5 +1,8 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io;
+
+use thiserror::Error;
 
 #[derive(Debug)]
 pub struct SmartHouseError {
@@ -22,7 +25,7 @@ impl Error for SmartHouseError {
 }
 #[derive(Debug)]
 pub struct InnerError {
-    description : String
+    pub(crate) description : String
 }
 
 impl Display for InnerError {
@@ -38,3 +41,16 @@ impl InnerError {
 }
 
 impl Error for InnerError {}
+
+/// Connection error. Includes IO and handshake error.
+#[derive(Debug, Error)]
+pub enum ConnectError {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("Command error: {0}")]
+    Command(#[from] SmartHouseError),
+}

@@ -7,6 +7,10 @@ edition = "2021"
 
 [workspace]
 
-members = [
-    "examples"
-]
+#members = [
+#    "examples"
+#]
+
+[dependencies]
+thiserror = "1.0.30"
+rand = "0.8.5"

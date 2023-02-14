@@ -1,7 +1,7 @@
 
 pub mod smart_house {
+
     use std::collections::HashMap;
-    use std::ops::{Deref, DerefMut};
     use crate::device_info_provider::{Device, DeviceInfoProvider, SmartSocket, SmartThermometer};
     use crate::errors::{DEVICE_ERROR, InnerError, ROOM_ERROR, SmartHouseError};
 
@@ -9,6 +9,14 @@ pub mod smart_house {
         name : String,
         rooms: HashMap<String, Room>,
     }
+
+    // impl Deref for SmartHouse {
+    //     type Target = Self;
+    //
+    //     fn deref(&self) -> &Self::Target {
+    //         &Self { name: String::from(&self.name), rooms: self.rooms }
+    //     }
+    // }
 
     pub struct Room {
         pub name : String,
@@ -54,10 +62,10 @@ pub mod smart_house {
 
         pub fn remove_room(&mut self, room_name : &str) -> Result<bool, SmartHouseError> {
             let remove = self.rooms.remove(room_name);
-            return match remove {
+            match remove {
                 None => { Err(SmartHouseError { source: (InnerError::new("no such room")) }) }
                 Some(_) => { Ok(true) }
-            };
+            }
         }
 
         pub fn get_devices(&self, room_name: &str) -> Option<Vec<&str>> {
@@ -72,26 +80,26 @@ pub mod smart_house {
 
         pub fn add_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
             let rooms = &mut self.rooms;
-            for r in rooms {
-                if r.0.eq(room_name) {
-                    let mut room = r.1;
-                    // TODO сделать это более красиво
+            let mut is_added = false;
+            rooms.iter_mut()
+                .filter(|r| r.1.name.eq(room_name))
+                .for_each(|r| {
                     if device_name.contains("Socket") {
-                        let device = SmartSocket { name: device_name.to_string() };
-                        room.devices.insert(device_name.to_string(), Box::new((device)));
-                        return Ok(true)
+                        let device = SmartSocket { is_on: false, name: device_name.to_string() };
+                        r.1.devices.insert(device_name.to_string(), Box::new(device));
+                        is_added = true;
                     } else if device_name.contains("Thermo") {
-                        let device = SmartThermometer { name: device_name.to_string()};
-                        room.devices.insert(device_name.to_string(), Box::new((device)));
-                        return Ok(true)
+                        let device = SmartThermometer { is_on: false, name: device_name.to_string()};
+                        r.1.devices.insert(device_name.to_string(), Box::new(device));
+                        is_added = true;
                     };
-                }
-            }
-            return Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) })
+            });
+            if is_added { Ok (true) }
+            else { Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) }) }
         }
 
         pub fn remove_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
-            let mut rooms = &mut self.rooms;
+            let rooms = &mut self.rooms;
             if !rooms.contains_key(room_name) {
                 return Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) })
             }
@@ -102,7 +110,7 @@ pub mod smart_house {
                     return Ok(true)
                 }
             }
-            return Err(SmartHouseError { source: (InnerError::new(DEVICE_ERROR)) })
+            Err(SmartHouseError { source: (InnerError::new(DEVICE_ERROR)) })
         }
 
         pub fn create_report(
@@ -115,16 +123,86 @@ pub mod smart_house {
             // todo!("перебор комнат и устройств в них для составления отчёта")
             device_info_provider.get_device_state(room_name, device_name)
         }
+
+        pub fn switch_socket(&mut self, room_name: &str, device_name : &str, state : bool)
+            -> Result<bool, SmartHouseError>
+        {
+            let room_opt = self.rooms.get_mut(room_name);
+            let room: &mut Room;
+
+            match room_opt {
+                Some(..) => { room = room_opt.unwrap() },
+                None => { return Err(SmartHouseError {
+                    source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
+            };
+
+            let device_opt = room.devices.get_mut(device_name);
+
+            match device_opt {
+                Some(dev) => {
+                    dev.switch_on_off(state);
+                    Ok(true)
+                },
+                None => Err(SmartHouseError {
+                    source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
+            }
+        }
+
+        pub fn get_socket_state(&mut self, room_name: &str, device_name : &str)
+            -> Result<f32, SmartHouseError>
+        {
+            let room_opt = self.rooms.get_mut(room_name);
+            let room: &mut Room;
+
+            match room_opt {
+                Some(..) => { room = room_opt.unwrap() },
+                None => { return Err(SmartHouseError {
+                    source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
+            };
+
+            let device_opt = room.devices.get_mut(device_name);
+
+            match device_opt {
+                Some(dev) => {
+                    let power = dev.get_consumed_power(device_name);
+                    Ok(power)
+                },
+                None => Err(SmartHouseError {
+                    source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
+            }
+        }
+
+        // fn find_device_by_name(&mut self, room_name: &str, device_name: &str)
+        //     -> Result<&mut Box<dyn Device>, SmartHouseError> {
+        //
+        //     let room_opt = self.rooms.get_mut(room_name);
+        //     let room: &mut Room;
+        //
+        //     match room_opt {
+        //         Some(..) => { room = &mut room_opt.unwrap() },
+        //         None => { return Err(SmartHouseError {
+        //                      source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
+        //     };
+        //
+        //     let mut device_opt_mut = room.devices.get_mut(device_name);
+        //     let mut device: &mut Box<dyn Device>;
+        //
+        //     match device_opt_mut {
+        //         Some(dev) => {
+        //             device = dev;
+        //             Ok(device) },
+        //         None => return Err(SmartHouseError {
+        //             source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
+        //     }
+        // }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-    use std::fmt::Debug;
-    use crate::smart_house::smart_house::{Room, SmartHouse};
+    use crate::smart_house::smart_house::{SmartHouse};
     use crate::device_info_provider::{*};
-    use crate::errors::{InnerError, SmartHouseError};
+
 
     #[test]
     fn test_new() {
@@ -141,27 +219,27 @@ mod tests {
         assert!(smart_house.get_rooms().contains(&"room3")
               & smart_house.get_rooms().contains(&"room4"));
 
-        smart_house.remove_room(&"room4");
+        smart_house.remove_room("room4").expect("error removing room");
         assert!(!smart_house.get_rooms().contains(&"room4"));
 
-        smart_house.add_device("room3", "Socket1");
-        smart_house.add_device("room3", "Socket2");
-        smart_house.add_device("room3", "Thermo1");
+        smart_house.add_device("room3", "Socket1").expect("error adding device");
+        smart_house.add_device("room3", "Socket2").expect("error adding device");
+        smart_house.add_device("room3", "Thermo1").expect("error adding device");
 
         let actual_devices = smart_house.get_devices("room3").unwrap()
             .join(" " );
         assert!(&actual_devices.contains("Socket1"));
         assert!(&actual_devices.contains("Socket2"));
         assert!(&actual_devices.contains("Thermo1"));
-        smart_house.remove_device("room3","Socket2");
-        assert!(!&actual_devices.contains("Socket2"));
+        smart_house.remove_device("room3","Socket2").expect("error removing device");
+        assert!(!&smart_house.get_devices("room3").unwrap().contains(&"Socket2"));
 
-        let socket1 = SmartSocket {name : "socket1".to_string()};
-        let socket2 = SmartSocket {name : "socket2".to_string()};
-        let thermo1 = SmartThermometer {name : "thermo1".to_string()};
+        let socket1 = SmartSocket { is_on: false, name : "socket1".to_string()};
+        let socket2 = SmartSocket { is_on: false, name : "socket2".to_string()};
+        let thermo1 = SmartThermometer { is_on: false, name : "thermo1".to_string()};
 
         let info_provider_1 = OwningDeviceInfoProvider {
-            name : &room1,
+            name : room1,
             sockets: vec![socket1, socket2],
             thermos: vec![thermo1]
         };
@@ -170,12 +248,12 @@ mod tests {
             &(info_provider_1), "room1", "socket2");
         assert_eq!(owning_report.unwrap(),"socket2");
 
-        let socket3 = SmartSocket {name : "socket3".to_string()};
-        let thermo2 = SmartThermometer {name : "thermo2".to_string()};
-        let thermo3 = SmartThermometer {name : "thermo3".to_string()};
+        let socket3 = SmartSocket { is_on: false, name : "socket3".to_string()};
+        let thermo2 = SmartThermometer { is_on: false, name : "thermo2".to_string()};
+        let thermo3 = SmartThermometer { is_on: false, name : "thermo3".to_string()};
 
         let info_provider_2 = BorrowingDeviceInfoProvider {
-            name : &room2,
+            name : room2,
             sockets: &vec![socket3],
             thermos: &vec![thermo2, thermo3],
         };
@@ -190,7 +268,7 @@ mod tests {
             Ok(..) => "".to_string()
         };
 
-        assert_eq!(err.to_string(), "InnerError has occured! no such room".to_string());
+        assert_eq!(err, "InnerError has occured! no such room".to_string());
 
         let err_result1 = smart_house.create_report (
             &(info_provider_2), "room2", "socket4");
@@ -200,6 +278,6 @@ mod tests {
             Ok(..) => "".to_string()
         };
 
-        assert_eq!(err1.to_string(), "InnerError has occured! no such device".to_string());
+        assert_eq!(err1, "InnerError has occured! no such device".to_string());
     }
 }
