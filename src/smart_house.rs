@@ -8,6 +8,7 @@ pub mod smart_house {
     pub struct SmartHouse {
         name : String,
         rooms: HashMap<String, Room>,
+        remote_thermo: Box<f32>
     }
 
     // impl Deref for SmartHouse {
@@ -42,9 +43,12 @@ pub mod smart_house {
                 )
                 .collect();
 
+            let remote_thermo = Box::new(0.0f32);
+
             SmartHouse {
                 name : own_name,
-                rooms
+                rooms,
+                remote_thermo
             }
         }
 
@@ -195,6 +199,14 @@ pub mod smart_house {
         //             source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
         //     }
         // }
+
+        pub fn set_thermo_data(&mut self, data: f32) {
+            *self.remote_thermo = data;
+        }
+
+        pub fn get_thermo_data(& self) -> f32 {
+            *self.remote_thermo
+        }
     }
 }
 

@@ -1,8 +1,11 @@
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::{Error, ErrorKind, IoSlice, Read, Write};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::{Arc, mpsc, Mutex};
 use std::{io, thread};
+use std::any::Any;
 use std::ops::DerefMut;
+use ErrorKind::*;
+use std::time::Duration;
 use crate::{END_MESSAGING_COMMAND, START_MESSAGING_COMMAND};
 use crate::errors::SmartHouseError;
 use crate::smart_house::smart_house::SmartHouse;
@@ -13,11 +16,61 @@ pub struct Server {
 
 impl Server {
 
-    pub fn start(self, addr : &str, pool_size: usize) {
+    pub fn start(self, own_addr: &str, pool_size: usize, remote_addr: &'static str) {
 
-        let listener = TcpListener::bind(addr).unwrap();
+        let listener = TcpListener::bind(own_addr).unwrap();
         let pool = ThreadPool::new(pool_size);
         let arc = Arc::new(Mutex::new(self.smart_house));
+        let arc_remote = arc.clone();
+
+        /*
+            В отдельном потоке пробуем соединиться с удаленным сервером, пока соединение не будет
+        установлено, после того как оно установилось, в цикле раз в 2 секунды опрашиваем сервер.
+        Если соединение обрывается - выходим из цикла и устанавливаем соединение снова.
+         */
+        thread::spawn(move || {
+            println!("thread for requesting remote server started");
+            loop {
+                let mut connection = UdpSocket::bind(remote_addr);
+                let mut udp_socket;
+                if connection.is_ok() {
+                   udp_socket = connection.unwrap();
+                } else {
+                    while !connection.is_ok() {
+                        thread::sleep(Duration::from_secs(1));
+                        println!("trying to get connection to remote server");
+                        connection = UdpSocket::bind(remote_addr);
+                    }
+                    udp_socket = connection.unwrap();
+                }
+                loop {
+                    let remote_data = Self::get_remote_thermo_data(&mut udp_socket);
+                    if remote_data.is_ok() {
+                        let remote_data = remote_data.unwrap();
+                        println!("remote data: {}", &remote_data);
+                        arc_remote.lock().unwrap().deref_mut().set_thermo_data(remote_data);
+                    } else {
+                        let error = remote_data.err().unwrap();
+                        println!("error while requesting remote data... {}", &error);
+                        match error.kind() {
+                            // здесь должны по-разному обрабатываться ошибки
+                            NotFound | ConnectionRefused | ConnectionReset | PermissionDenied
+                            | HostUnreachable | NetworkUnreachable | ConnectionAborted |
+                            NotConnected | AddrInUse | AddrNotAvailable | TimedOut | InvalidData
+                            | Other | UnexpectedEof | NetworkDown => {
+                                println!("error kind : {}", &error.kind());
+                                return;
+                            }
+                            _ => {
+                                println!("error kind : {}", &error.kind());
+                                return;
+                            }
+                        }
+                    }
+                    thread::sleep(Duration::from_secs(2));
+                }
+            }
+        });
 
         println!("server started");
         for stream in listener.incoming() {
@@ -27,6 +80,10 @@ impl Server {
                 Self::handle_connection(arc, stream)
             });
         }
+    }
+
+    pub fn get_remote_data(&self) -> f32 {
+        self.smart_house.get_thermo_data()
     }
 
     fn handle_connection(smart_house: Arc<Mutex<SmartHouse>>, mut stream: TcpStream) {
@@ -73,6 +130,18 @@ impl Server {
             println!("could not get lock, lock is poisoned!");
         }
         println!("release lock...");
+    }
+
+    fn get_remote_thermo_data(udp_socket: &mut UdpSocket) -> Result<f32, io::Error> {
+        let buf = &mut [0u8, 0u8, 0u8, 0u8];
+        udp_socket.recv(buf)?;
+        let vec = buf.to_vec();
+        let mut data: [u8; 4] = [0u8, 0u8, 0u8, 0u8];
+        for (i,e) in vec.iter().enumerate() {
+            data[i] = *e;
+        }
+        let temperature = f32::from_be_bytes(data);
+        Ok(temperature)
     }
 
     fn command(smart_house : &mut SmartHouse,

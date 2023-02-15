@@ -27,20 +27,6 @@ pub struct SmartThermometer {
     pub name : String
 }
 
-// impl <'a> Deref for SmartSocket {
-//     type Target = (bool, &'a str);
-//
-//     fn deref(&'a self) -> &Self::Target {
-//          &(self.is_on, &self.name)
-//     }
-// }
-//
-// impl DerefMut for SmartSocket {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut (self.is_on, &self.name)
-//     }
-// }
-
 impl Device for SmartSocket {
 
     fn get_name(&self) -> &str {
@@ -52,27 +38,13 @@ impl Device for SmartSocket {
     }
 
     fn get_consumed_power(&mut self, name: &str) -> f32 {
-        rand::thread_rng().gen_range(5..10) as f32 // TODO float point
+        rand::thread_rng().gen_range(5f32..10f32)
     }
 
     fn switch_on_off(&mut self, is_on: bool) {
         self.is_on = is_on;
     }
 }
-
-// impl <'a> Deref for SmartThermometer {
-//     type Target =  (bool, &'a str);
-//
-//     fn deref(&'a self) -> &Self::Target {
-//         &(self.is_on, &self.name)
-//     }
-// }
-
-// impl DerefMut for SmartThermometer {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut (self.is_on, &self.name)
-//     }
-// }
 
 impl Device for SmartThermometer {
 
@@ -101,10 +73,10 @@ pub struct OwningDeviceInfoProvider<'a> {
     pub thermos: Vec<SmartThermometer>,
 }
 
-pub struct BorrowingDeviceInfoProvider <'a, 'b> {
+pub struct BorrowingDeviceInfoProvider <'a> {
     pub name : &'a str,
-    pub sockets: &'b Vec<SmartSocket>,
-    pub thermos: &'b Vec<SmartThermometer>,
+    pub sockets: &'a Vec<SmartSocket>,
+    pub thermos: &'a Vec<SmartThermometer>,
 }
 
 // todo: реализация трейта `DeviceInfoProvider` для поставщиков информации
@@ -136,7 +108,7 @@ impl<'a> DeviceInfoProvider for OwningDeviceInfoProvider<'a> {
     }
 }
 
-impl<'a,'b> DeviceInfoProvider for BorrowingDeviceInfoProvider<'a, 'b> {
+impl<'a> DeviceInfoProvider for BorrowingDeviceInfoProvider<'a> {
     fn get_device_state(&self, room_name: &str, device_name: &str)
         -> Result<String, SmartHouseError> {
 
