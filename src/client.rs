@@ -58,12 +58,12 @@ impl Client {
                     let consumed_power = f32::from_str(recieved_message.unwrap().as_str());
                     match consumed_power {
                         Ok(f) => Ok(f),
-                        Err(e) => Err(CommandError::Command(SmartHouseError {  /// TODO
+                        Err(_) => Err(CommandError::Command(SmartHouseError {
                             source: (InnerError::new(DEVICE_ERROR)) }))
                     }
                 }
                 Err(e) => {
-                    println!("error : {}", e);
+                    println!("error : {e}");
                     Err(CommandError::Command(SmartHouseError {
                         source: (InnerError::new(DEVICE_ERROR)) }))
                 }

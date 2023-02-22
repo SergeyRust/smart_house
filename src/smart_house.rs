@@ -1,5 +1,5 @@
 
-pub mod smart_house {
+
 
     use std::collections::HashMap;
     use crate::device_info_provider::{Device, DeviceInfoProvider, SmartSocket, SmartThermometer};
@@ -176,6 +176,7 @@ pub mod smart_house {
             }
         }
 
+        /// TODO понять как вернуть из функции мутабельную ссылку
         // fn find_device_by_name(&mut self, room_name: &str, device_name: &str)
         //     -> Result<&mut Box<dyn Device>, SmartHouseError> {
         //
@@ -208,11 +209,11 @@ pub mod smart_house {
             *self.remote_thermo
         }
     }
-}
+
 
 #[cfg(test)]
 mod tests {
-    use crate::smart_house::smart_house::{SmartHouse};
+    use crate::smart_house::{SmartHouse};
     use crate::device_info_provider::{*};
 
 
@@ -229,7 +230,7 @@ mod tests {
         smart_house.add_room("room3");
         smart_house.add_room("room4");
         assert!(smart_house.get_rooms().contains(&"room3")
-              & smart_house.get_rooms().contains(&"room4"));
+            & smart_house.get_rooms().contains(&"room4"));
 
         smart_house.remove_room("room4").expect("error removing room");
         assert!(!smart_house.get_rooms().contains(&"room4"));
@@ -239,41 +240,41 @@ mod tests {
         smart_house.add_device("room3", "Thermo1").expect("error adding device");
 
         let actual_devices = smart_house.get_devices("room3").unwrap()
-            .join(" " );
+            .join(" ");
         assert!(&actual_devices.contains("Socket1"));
         assert!(&actual_devices.contains("Socket2"));
         assert!(&actual_devices.contains("Thermo1"));
-        smart_house.remove_device("room3","Socket2").expect("error removing device");
+        smart_house.remove_device("room3", "Socket2").expect("error removing device");
         assert!(!&smart_house.get_devices("room3").unwrap().contains(&"Socket2"));
 
-        let socket1 = SmartSocket { is_on: false, name : "socket1".to_string()};
-        let socket2 = SmartSocket { is_on: false, name : "socket2".to_string()};
-        let thermo1 = SmartThermometer { is_on: false, name : "thermo1".to_string()};
+        let socket1 = SmartSocket { is_on: false, name: "socket1".to_string() };
+        let socket2 = SmartSocket { is_on: false, name: "socket2".to_string() };
+        let thermo1 = SmartThermometer { is_on: false, name: "thermo1".to_string() };
 
         let info_provider_1 = OwningDeviceInfoProvider {
-            name : room1,
+            name: room1,
             sockets: vec![socket1, socket2],
             thermos: vec![thermo1]
         };
 
-        let owning_report = smart_house.create_report (
+        let owning_report = smart_house.create_report(
             &(info_provider_1), "room1", "socket2");
-        assert_eq!(owning_report.unwrap(),"socket2");
+        assert_eq!(owning_report.unwrap(), "socket2");
 
-        let socket3 = SmartSocket { is_on: false, name : "socket3".to_string()};
-        let thermo2 = SmartThermometer { is_on: false, name : "thermo2".to_string()};
-        let thermo3 = SmartThermometer { is_on: false, name : "thermo3".to_string()};
+        let socket3 = SmartSocket { is_on: false, name: "socket3".to_string() };
+        let thermo2 = SmartThermometer { is_on: false, name: "thermo2".to_string() };
+        let thermo3 = SmartThermometer { is_on: false, name: "thermo3".to_string() };
 
         let info_provider_2 = BorrowingDeviceInfoProvider {
-            name : room2,
+            name: room2,
             sockets: &vec![socket3],
             thermos: &vec![thermo2, thermo3],
         };
-        let borrowing_report = smart_house.create_report (
+        let borrowing_report = smart_house.create_report(
             &(info_provider_2), "room2", "socket3");
         assert_eq!(borrowing_report.unwrap(), "socket3");
 
-        let err_result = smart_house.create_report (
+        let err_result = smart_house.create_report(
             &(info_provider_1), "room4", "socket4");
         let err = match err_result {
             Err(..) => err_result.err().unwrap().source.to_string(),
@@ -282,7 +283,7 @@ mod tests {
 
         assert_eq!(err, "InnerError has occured! no such room".to_string());
 
-        let err_result1 = smart_house.create_report (
+        let err_result1 = smart_house.create_report(
             &(info_provider_2), "room2", "socket4");
 
         let err1 = match err_result1 {
@@ -293,3 +294,4 @@ mod tests {
         assert_eq!(err1, "InnerError has occured! no such device".to_string());
     }
 }
+

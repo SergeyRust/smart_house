@@ -1,14 +1,13 @@
-use std::io::{Error, ErrorKind, IoSlice, Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
+use std::io::{ ErrorKind, Read, Write};
+use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::sync::{Arc, mpsc, Mutex};
 use std::{io, thread};
-use std::any::Any;
 use std::ops::DerefMut;
 use ErrorKind::*;
 use std::time::Duration;
 use crate::{END_MESSAGING_COMMAND, START_MESSAGING_COMMAND};
 use crate::errors::SmartHouseError;
-use crate::smart_house::smart_house::SmartHouse;
+use crate::smart_house::SmartHouse;
 
 pub struct Server {
     pub smart_house : SmartHouse
@@ -32,24 +31,25 @@ impl Server {
             println!("thread for requesting remote server started");
             loop {
                 let mut connection = UdpSocket::bind(remote_addr);
-                let mut udp_socket;
-                if connection.is_ok() {
-                   udp_socket = connection.unwrap();
-                } else {
-                    while !connection.is_ok() {
-                        thread::sleep(Duration::from_secs(1));
-                        println!("trying to get connection to remote server");
-                        connection = UdpSocket::bind(remote_addr);
+                let mut udp_socket = loop {
+                    match connection {
+                        Ok(udp_socket) => {
+                            break udp_socket;
+                        }
+                        Err(err) => {
+                            println!("Trying to get connection to remote server failed: {err}");
+                            thread::sleep(Duration::from_secs(1));
+                            connection = UdpSocket::bind(remote_addr);
+                        }
                     }
-                    udp_socket = connection.unwrap();
-                }
+                };
                 loop {
                     let remote_data = Self::get_remote_thermo_data(&mut udp_socket);
-                    if remote_data.is_ok() {
-                        let remote_data = remote_data.unwrap();
-                        println!("remote data: {}", &remote_data);
-                        arc_remote.lock().unwrap().deref_mut().set_thermo_data(remote_data);
-                    } else {
+                    if let Ok(temperature) = remote_data {
+                        println!("remote data (temperature): {temperature}");
+                        arc_remote.lock().unwrap().deref_mut().set_thermo_data(temperature);
+                    }
+                    else {
                         let error = remote_data.err().unwrap();
                         println!("error while requesting remote data... {}", &error);
                         match error.kind() {
@@ -106,7 +106,7 @@ impl Server {
         };
 
         let command = commands.get(1).unwrap();
-        println!("command: {:#?}", command);
+        println!("command: {command}" );
 
         let args = commands.iter()
             .skip(3)
@@ -115,13 +115,9 @@ impl Server {
             .flat_map(|s| s.split(' '))
             .filter(|e| e.ne(&String::from("").as_str()))
             .collect::<Vec<&str>>();
-        //args.pop(); // TODO как сделать .take_while() , чтобы он не включал последний элемент?
 
         let lock = smart_house.lock();
-
-        if lock.is_ok() {
-            let mut lock = lock.unwrap();
-            println!("get lock...");
+        if let Ok(mut lock) = lock {
             let res = Self::command(lock.deref_mut(), &mut stream, command.as_str(), args);
             if res.is_err() {
                 Self::send_bytes("unable to process request...".as_bytes(),&mut stream).expect("error");
@@ -129,14 +125,13 @@ impl Server {
         } else {
             println!("could not get lock, lock is poisoned!");
         }
-        println!("release lock...");
     }
 
     fn get_remote_thermo_data(udp_socket: &mut UdpSocket) -> Result<f32, io::Error> {
-        let buf = &mut [0u8, 0u8, 0u8, 0u8];
+        let buf: &mut [u8; 4] = &mut Default::default();
         udp_socket.recv(buf)?;
         let vec = buf.to_vec();
-        let mut data: [u8; 4] = [0u8, 0u8, 0u8, 0u8];
+        let mut data: [u8; 4] = Default::default();
         for (i,e) in vec.iter().enumerate() {
             data[i] = *e;
         }

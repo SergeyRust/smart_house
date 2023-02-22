@@ -9,8 +9,15 @@ pub struct SmartHouseError {
     pub(crate) source : InnerError
 }
 
+impl SmartHouseError {
+    pub fn new(source: InnerError) -> Self {
+        SmartHouseError {source}
+    }
+}
+
 pub const ROOM_ERROR: &str = "no such room";
 pub const DEVICE_ERROR: &str = "no such device";
+pub const NETWORK_ERR: &str = "network err";
 
 impl Display for SmartHouseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -42,7 +49,7 @@ impl InnerError {
 
 impl Error for InnerError {}
 
-/// Connection error. Includes IO and handshake error.
+/// Connection error (IO error).
 #[derive(Debug, Error)]
 pub enum ConnectError {
     #[error("IO error: {0}")]

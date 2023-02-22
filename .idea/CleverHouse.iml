@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/ examples/smart_house_example/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/clever_house_async/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/ examples/smart_house_example/target" />
     </content>

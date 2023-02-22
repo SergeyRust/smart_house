@@ -15,8 +15,8 @@ impl RemoteServer {
             loop {
                 thread::sleep(Duration::from_secs(3));
                 let data = Self::generate_temperature_data();
-                println!("data : {}", data);
-                let buf = &mut [0u8, 0u8, 0u8, 0u8];
+                println!("data : {data}");
+                let buf: &mut [u8; 4] = &mut Default::default();
                 let bites = data.to_be_bytes();
                 for (i,e) in bites.iter().enumerate() {
                     buf[i] = *e;
