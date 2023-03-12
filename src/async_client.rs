@@ -3,7 +3,9 @@ use std::str::FromStr;
 use tokio::io;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use crate::{ARGUMENTS, END_MESSAGING_COMMAND, GET_SOCKET_CONSUMED_POWER, START_MESSAGING_COMMAND, SWITCH_SOCKET_COMMAND};
-use crate::errors::{CommandError, ConnectError, DEVICE_ERROR, InnerError, NETWORK_ERR, SmartHouseError};
+use crate::errors::SmartHouseError;
+use crate::errors::DeviceError::SocketError;
+use crate::errors::SmartHouseError::{CommandError, NetworkError, ServerError, WrongRequestDataError};
 
 pub struct AsyncClient {
     stream: TcpStream,
@@ -11,7 +13,7 @@ pub struct AsyncClient {
 
 impl AsyncClient {
 
-    pub async fn connect<Addrs>( addrs: Addrs) -> Result<Self, ConnectError>
+    pub async fn connect<Addrs>( addrs: Addrs) -> Result<Self, SmartHouseError>
         where
             Addrs: ToSocketAddrs,
     {
@@ -21,7 +23,7 @@ impl AsyncClient {
     }
 
     pub async fn switch_socket(&mut self, room_name: &str, device_name: &str, state : bool)
-                         -> Result<bool, CommandError>
+                         -> Result<bool, SmartHouseError>
     {
         let command = String::from(START_MESSAGING_COMMAND) + "\n" + SWITCH_SOCKET_COMMAND
             + "\n" + ARGUMENTS + "\n" + room_name + " " + device_name + " " + state.to_string().as_str()
@@ -30,27 +32,24 @@ impl AsyncClient {
         let send = Self::send_request(self, command).await;
         if send.is_err() {
             println!("error while sending request {}", send.err().unwrap());
-            return Err(CommandError::Command(SmartHouseError {
-                source: (InnerError::new(NETWORK_ERR)) }));
+            return Err(CommandError(SocketError("error while sending request to server")));
         }
         match Self::receive_response(self).await {
             Ok(_) => Ok(true),
-            Err(_) => Err(CommandError::Command(SmartHouseError {
-                source: (InnerError::new(NETWORK_ERR)) }))
+            Err(e) => Err(NetworkError(e))
         }
     }
 
     pub async fn get_consumed_power(&mut self, room_name: &str, device_name: &str)
-                              -> Result<f32, CommandError>
+                              -> Result<f32, SmartHouseError>
     {
         let command = String::from(START_MESSAGING_COMMAND) + "\n" + GET_SOCKET_CONSUMED_POWER
             + "\n" + ARGUMENTS + "\n" + room_name + " " + device_name + "\n"
             + END_MESSAGING_COMMAND;
 
         let send = match Self::send_request(self, command).await {
-            Ok(()) => Ok(true),
-            Err(_) => Err(CommandError::Command(SmartHouseError {  /// TODO
-                source: (InnerError::new(NETWORK_ERR)) }))
+            Ok(()) => Ok(()),
+            Err(e) => Err(e)
         };
 
         if send.is_ok() {
@@ -60,19 +59,16 @@ impl AsyncClient {
                     let consumed_power = f32::from_str(recieved_message.unwrap().as_str());
                     match consumed_power {
                         Ok(f) => Ok(f),
-                        Err(_) => Err(CommandError::Command(SmartHouseError {
-                            source: (InnerError::new(NETWORK_ERR)) }))
+                        Err(_) => Err(ServerError("could not parse data"))
                     }
                 }
                 Err(e) => {
                     println!("error : {e}");
-                    Err(CommandError::Command(SmartHouseError {
-                        source: (InnerError::new(DEVICE_ERROR)) }))
+                    Err(NetworkError(e))
                 }
             }
         } else {
-            Err(CommandError::Command(SmartHouseError {
-                source: (InnerError::new(DEVICE_ERROR)) }))
+            Err(NetworkError(send.err().unwrap()))
         }
     }
 

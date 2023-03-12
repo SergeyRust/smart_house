@@ -4,60 +4,30 @@ use std::io;
 
 use thiserror::Error;
 
-#[derive(Debug)]
-pub struct SmartHouseError {
-    pub(crate) source : InnerError
+pub const ROOM_ERROR : &str = "no such room";
+pub const DEVICE_ERROR : &str = "no such device";
+
+#[derive(Error, Debug)]
+pub enum SmartHouseError {
+    NetworkError(#[from] io::Error),
+    WrongRequestDataError(&'static str),
+    CommandError(#[from] DeviceError),
+    ServerError(&'static str)
 }
 
-impl SmartHouseError {
-    pub fn new(source: InnerError) -> Self {
-        SmartHouseError {source}
+#[derive(Debug, Error)]
+pub enum DeviceError {
+    SocketError(&'static str), ThermoError(&'static str),
+}
+
+impl Display for DeviceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommandError :{}", self.source().unwrap().description())
     }
 }
-
-pub const ROOM_ERROR: &str = "no such room";
-pub const DEVICE_ERROR: &str = "no such device";
-pub const NETWORK_ERR: &str = "network err";
 
 impl Display for SmartHouseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SmartHouseError :{}", self.source.description)
+        write!(f, "SmartHouseError :{}", self.source().unwrap().description())
     }
-}
-
-impl Error for SmartHouseError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.source)
-    }
-}
-#[derive(Debug)]
-pub struct InnerError {
-    pub(crate) description : String
-}
-
-impl Display for InnerError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InnerError has occured! {}", &self.description)
-    }
-}
-
-impl InnerError {
-    pub fn new(descr : &str) -> Self {
-        InnerError{ description : String::from(descr) }
-    }
-}
-
-impl Error for InnerError {}
-
-/// Connection error (IO error).
-#[derive(Debug, Error)]
-pub enum ConnectError {
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum CommandError {
-    #[error("Command error: {0}")]
-    Command(#[from] SmartHouseError),
 }

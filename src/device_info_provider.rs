@@ -1,5 +1,5 @@
 use crate::errors::{DEVICE_ERROR, ROOM_ERROR, SmartHouseError};
-use crate::errors::InnerError;
+use crate::errors::SmartHouseError::WrongRequestDataError;
 use rand::Rng;
 
 pub trait DeviceInfoProvider {
@@ -87,7 +87,7 @@ impl<'a> DeviceInfoProvider for OwningDeviceInfoProvider<'a> {
         -> Result<String, SmartHouseError> {
 
         if !room_name.eq(self.name) {
-            return Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) })
+            return Err(WrongRequestDataError(ROOM_ERROR))
         }
 
         let mut info = String::from("");
@@ -103,7 +103,7 @@ impl<'a> DeviceInfoProvider for OwningDeviceInfoProvider<'a> {
         }
         if !info.is_empty() { Ok(info) }
         else {
-            Err(SmartHouseError { source: (InnerError::new(DEVICE_ERROR)) })
+            Err(WrongRequestDataError(DEVICE_ERROR))
         }
     }
 }
@@ -113,7 +113,7 @@ impl<'a> DeviceInfoProvider for BorrowingDeviceInfoProvider<'a> {
         -> Result<String, SmartHouseError> {
 
         if !room_name.eq(self.name) {
-            return Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) })
+            return Err(WrongRequestDataError(ROOM_ERROR))
         }
 
         let mut info = String::from("");
@@ -129,7 +129,7 @@ impl<'a> DeviceInfoProvider for BorrowingDeviceInfoProvider<'a> {
         }
         if !info.is_empty() { Ok(info) }
         else {
-            Err(SmartHouseError{ source: (InnerError::new(DEVICE_ERROR)) })
+            Err(WrongRequestDataError(DEVICE_ERROR))
         }
     }
 }

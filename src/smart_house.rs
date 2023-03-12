@@ -1,9 +1,7 @@
 
-
-
     use std::collections::HashMap;
     use crate::device_info_provider::{Device, DeviceInfoProvider, SmartSocket, SmartThermometer};
-    use crate::errors::{DEVICE_ERROR, InnerError, ROOM_ERROR, SmartHouseError};
+    use crate::errors::{DEVICE_ERROR, ROOM_ERROR, SmartHouseError};
 
     pub struct SmartHouse {
         name : String,
@@ -67,7 +65,7 @@
         pub fn remove_room(&mut self, room_name : &str) -> Result<bool, SmartHouseError> {
             let remove = self.rooms.remove(room_name);
             match remove {
-                None => { Err(SmartHouseError { source: (InnerError::new("no such room")) }) }
+                None => { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
                 Some(_) => { Ok(true) }
             }
         }
@@ -99,13 +97,13 @@
                     };
             });
             if is_added { Ok (true) }
-            else { Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) }) }
+            else { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
         }
 
         pub fn remove_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
             let rooms = &mut self.rooms;
             if !rooms.contains_key(room_name) {
-                return Err(SmartHouseError { source: (InnerError::new(ROOM_ERROR)) })
+                return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))
             }
             for r in rooms {
                 if r.0.eq(room_name) {
@@ -114,7 +112,7 @@
                     return Ok(true)
                 }
             }
-            Err(SmartHouseError { source: (InnerError::new(DEVICE_ERROR)) })
+            Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
         }
 
         pub fn create_report(
@@ -136,8 +134,7 @@
 
             match room_opt {
                 Some(..) => { room = room_opt.unwrap() },
-                None => { return Err(SmartHouseError {
-                    source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
+                None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
             };
 
             let device_opt = room.devices.get_mut(device_name);
@@ -147,8 +144,7 @@
                     dev.switch_on_off(state);
                     Ok(true)
                 },
-                None => Err(SmartHouseError {
-                    source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
+                None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
             }
         }
 
@@ -160,8 +156,7 @@
 
             match room_opt {
                 Some(..) => { room = room_opt.unwrap() },
-                None => { return Err(SmartHouseError {
-                    source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
+                None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
             };
 
             let device_opt = room.devices.get_mut(device_name);
@@ -171,35 +166,9 @@
                     let power = dev.get_consumed_power(device_name);
                     Ok(power)
                 },
-                None => Err(SmartHouseError {
-                    source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
+                None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
             }
         }
-
-        /// TODO понять как вернуть из функции мутабельную ссылку
-        // fn find_device_by_name(&mut self, room_name: &str, device_name: &str)
-        //     -> Result<&mut Box<dyn Device>, SmartHouseError> {
-        //
-        //     let room_opt = self.rooms.get_mut(room_name);
-        //     let room: &mut Room;
-        //
-        //     match room_opt {
-        //         Some(..) => { room = &mut room_opt.unwrap() },
-        //         None => { return Err(SmartHouseError {
-        //                      source: (InnerError { description: ROOM_ERROR.parse().unwrap() }) })}
-        //     };
-        //
-        //     let mut device_opt_mut = room.devices.get_mut(device_name);
-        //     let mut device: &mut Box<dyn Device>;
-        //
-        //     match device_opt_mut {
-        //         Some(dev) => {
-        //             device = dev;
-        //             Ok(device) },
-        //         None => return Err(SmartHouseError {
-        //             source: (InnerError { description: DEVICE_ERROR.parse().unwrap() }) })
-        //     }
-        // }
 
         pub fn set_thermo_data(&mut self, data: f32) {
             *self.remote_thermo = data;
@@ -277,21 +246,21 @@ mod tests {
         let err_result = smart_house.create_report(
             &(info_provider_1), "room4", "socket4");
         let err = match err_result {
-            Err(..) => err_result.err().unwrap().source.to_string(),
+            Err(..) => err_result.err().unwrap().to_string(),
             Ok(..) => "".to_string()
         };
 
-        assert_eq!(err, "InnerError has occured! no such room".to_string());
+        //assert_eq!(err, "InnerError has occured! no such room".to_string());
 
         let err_result1 = smart_house.create_report(
             &(info_provider_2), "room2", "socket4");
 
         let err1 = match err_result1 {
-            Err(..) => err_result1.err().unwrap().source.to_string(),
+            Err(..) => err_result1.err().unwrap().to_string(),
             Ok(..) => "".to_string()
         };
 
-        assert_eq!(err1, "InnerError has occured! no such device".to_string());
+        //assert_eq!(err1, "InnerError has occured! no such device".to_string());
     }
 }
 

@@ -1,12 +1,14 @@
+
 use std::io::Error;
-use std::ops::{Add, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::io;
-use crate::errors::{InnerError, SmartHouseError};
+use crate::errors::{DeviceError, SmartHouseError};
 use crate::smart_house::SmartHouse;
 use tokio::net::{TcpListener, TcpStream};
 use crate::{Command, END_MESSAGING_COMMAND, START_MESSAGING_COMMAND};
+use crate::errors::SmartHouseError::{ServerError, WrongRequestDataError};
 
 pub struct AsyncServer {
     pub smart_house : SmartHouse
@@ -74,13 +76,10 @@ impl AsyncServer {
                         let resp = String::from("socket ")
                             .add(device.as_str())
                             .add(" switched successfully");
-                        println!("{resp}");
                         Ok(resp)
                     } else {
                         let err = res.err().unwrap();
-                        println!("error {}", &err);
-                        Err(SmartHouseError::new(InnerError{
-                            description: "could not switch socket".to_string() }))
+                        Err(SmartHouseError::CommandError(DeviceError::SocketError("could not switch socket")))
                     }
                 }
                 Ok(Command::GetSocketConsumedPower(room, device)) => {
@@ -92,28 +91,26 @@ impl AsyncServer {
                     } else {
                         let err = res.err().unwrap();
                         println!("error while getting consumed power {err}");
-                        Err(SmartHouseError::new(InnerError{
-                            description: "could not get socket consumed power".to_string() }))
+                        Err(SmartHouseError::CommandError(DeviceError::SocketError("could not get socket consumed")))
                     }
                 }
                 Err(e) => {
-                    Err( SmartHouseError::new(e) )
+                    Err(ServerError("Could not parse command") )
                 }
             }
         } else {
-            Err(SmartHouseError::new(InnerError{ description: "could not get lock".to_string() }))
+            Err(ServerError("Internal Server Error"))
         }
     }
 
-    fn parse_command(bytes: Vec<u8>) -> Result<Command, InnerError> {
+    fn parse_command(bytes: Vec<u8>) -> Result<Command, SmartHouseError> {
         let commands = String::from_utf8(bytes).unwrap()
             .split('\n')
             .map(String::from)
             .collect::<Vec<String>>();
 
         if !commands.get(0).unwrap().contains(START_MESSAGING_COMMAND) {
-            println!("wrong start command...");
-            return Err(InnerError{description : String::from("wrong start command")})
+            return Err(WrongRequestDataError("wrong start command"));
         }
 
         let command = commands.get(1).unwrap();
@@ -128,7 +125,7 @@ impl AsyncServer {
             .collect::<Vec<String>>();
 
         match command.as_str() {
-            crate::SWITCH_SOCKET_COMMAND=> {
+            crate::SWITCH_SOCKET_COMMAND => {
                 Ok(Command::SwitchSocketCommand(
                     String::from(args.get(0).unwrap().as_str()),
                     String::from(args.get(1).unwrap().as_str()),
@@ -144,7 +141,7 @@ impl AsyncServer {
         }
     }
 
-    async fn send_response(stream: TcpStream, resp: &str) ->  Result<usize, Error> {
+    async fn send_response(stream: TcpStream, resp: &str) ->  Result<usize, SmartHouseError> {
         let buf = &mut resp.as_bytes();
         let mut written = 0;
 
@@ -157,7 +154,7 @@ impl AsyncServer {
                     written += n;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                Err(e) => return Err(e),
+                Err(e) => return Err(SmartHouseError::NetworkError(e)),
             }
         }
 
