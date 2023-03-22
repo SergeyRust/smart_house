@@ -1,183 +1,174 @@
+use std::collections::HashMap;
+use crate::device_info_provider::{Device, DeviceInfoProvider, SmartSocket, SmartThermometer};
+use crate::errors::{DEVICE_ERROR, ROOM_ERROR, SmartHouseError};
 
-    use std::collections::HashMap;
-    use crate::device_info_provider::{Device, DeviceInfoProvider, SmartSocket, SmartThermometer};
-    use crate::errors::{DEVICE_ERROR, ROOM_ERROR, SmartHouseError};
+pub struct SmartHouse {
+    name : String,
+    rooms: HashMap<String, Room>,
+    remote_thermo: Box<f32>
+}
 
-    pub struct SmartHouse {
-        name : String,
-        rooms: HashMap<String, Room>,
-        remote_thermo: Box<f32>
-    }
+pub struct Room {
+    pub name : String,
+    /*   название девайса /сам девайс с данными (возможно в будущем добавятся)   */
+    pub devices : HashMap<String, Box<dyn Device>>,
+}
 
-    // impl Deref for SmartHouse {
-    //     type Target = Self;
-    //
-    //     fn deref(&self) -> &Self::Target {
-    //         &Self { name: String::from(&self.name), rooms: self.rooms }
-    //     }
-    // }
+impl SmartHouse {
 
-    pub struct Room {
-        pub name : String,
-        /*   название девайса /сам девайс с данными (возможно в будущем добавятся)   */
-        pub devices : HashMap<String, Box<dyn Device>>,
-    }
+    pub fn new(name : &str, rooms_names : Vec<&str>) -> Self {
+        let own_name = String::from(name);
+        let rooms = Box::new(rooms_names);
+        let rooms : HashMap<String, Room> =  rooms.iter()
+            .map(|r|
+                     (
+                         String::from(*r),
+                         Room {
+                            name : String::from(*r),
+                            devices: HashMap::new(),
+                        }
+                     )
 
-    impl SmartHouse {
-        
-        pub fn new(name : &str, rooms_names : Vec<&str>) -> Self {
-            let own_name = String::from(name);
-            let rooms = Box::new(rooms_names);
-            let rooms : HashMap<String, Room> =  rooms.iter()
-                .map(|r|
-                         (
-                             String::from(*r),
-                             Room {
-                                name : String::from(*r),
-                                devices: HashMap::new(),
-                            }
-                         )
+            )
+            .collect();
 
-                )
-                .collect();
+        let remote_thermo = Box::new(0.0f32);
 
-            let remote_thermo = Box::new(0.0f32);
-
-            SmartHouse {
-                name : own_name,
-                rooms,
-                remote_thermo
-            }
-        }
-
-        pub fn get_rooms(&self) -> Vec<&str> {
-            let mut result = Vec::new();
-            self.rooms.iter().for_each(|r| result.push(r.0.as_str()));
-            result
-        }
-
-        pub fn add_room(&mut self, room_name : &str) {
-            let room = Room { name: String::from(room_name), devices: HashMap::new() };
-            let room_name = String::from(room_name);
-            self.rooms.insert(room_name, room);
-        }
-
-        pub fn remove_room(&mut self, room_name : &str) -> Result<bool, SmartHouseError> {
-            let remove = self.rooms.remove(room_name);
-            match remove {
-                None => { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
-                Some(_) => { Ok(true) }
-            }
-        }
-
-        pub fn get_devices(&self, room_name: &str) -> Option<Vec<&str>> {
-            if !self.rooms.contains_key(room_name) { return None }
-            let room = self.rooms.get(room_name);
-            let devices = room
-                .map(|r| r.devices.keys()
-                    .map(|k| k.as_str()).collect())
-                .unwrap();
-            Some(devices)
-        }
-
-        pub fn add_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
-            let rooms = &mut self.rooms;
-            let mut is_added = false;
-            rooms.iter_mut()
-                .filter(|r| r.1.name.eq(room_name))
-                .for_each(|r| {
-                    if device_name.contains("Socket") {
-                        let device = SmartSocket { is_on: false, name: device_name.to_string() };
-                        r.1.devices.insert(device_name.to_string(), Box::new(device));
-                        is_added = true;
-                    } else if device_name.contains("Thermo") {
-                        let device = SmartThermometer { is_on: false, name: device_name.to_string()};
-                        r.1.devices.insert(device_name.to_string(), Box::new(device));
-                        is_added = true;
-                    };
-            });
-            if is_added { Ok (true) }
-            else { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
-        }
-
-        pub fn remove_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
-            let rooms = &mut self.rooms;
-            if !rooms.contains_key(room_name) {
-                return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))
-            }
-            for r in rooms {
-                if r.0.eq(room_name) {
-                    let room = r.1;
-                    room.devices.remove(device_name);
-                    return Ok(true)
-                }
-            }
-            Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
-        }
-
-        pub fn create_report(
-            &self,
-            /* todo: принять обобщённый тип предоставляющий информацию об устройствах */
-            device_info_provider : &dyn DeviceInfoProvider,
-            room_name : &str,
-            device_name : &str
-        ) -> Result <String, SmartHouseError, > {
-            // todo!("перебор комнат и устройств в них для составления отчёта")
-            device_info_provider.get_device_state(room_name, device_name)
-        }
-
-        pub fn switch_socket(&mut self, room_name: &str, device_name : &str, state : bool)
-            -> Result<bool, SmartHouseError>
-        {
-            let room_opt = self.rooms.get_mut(room_name);
-            let room: &mut Room;
-
-            match room_opt {
-                Some(..) => { room = room_opt.unwrap() },
-                None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
-            };
-
-            let device_opt = room.devices.get_mut(device_name);
-
-            match device_opt {
-                Some(dev) => {
-                    dev.switch_on_off(state);
-                    Ok(true)
-                },
-                None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
-            }
-        }
-
-        pub fn get_socket_state(&mut self, room_name: &str, device_name : &str)
-            -> Result<f32, SmartHouseError>
-        {
-            let room_opt = self.rooms.get_mut(room_name);
-            let room: &mut Room;
-
-            match room_opt {
-                Some(..) => { room = room_opt.unwrap() },
-                None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
-            };
-
-            let device_opt = room.devices.get_mut(device_name);
-
-            match device_opt {
-                Some(dev) => {
-                    let power = dev.get_consumed_power(device_name);
-                    Ok(power)
-                },
-                None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
-            }
-        }
-
-        pub fn set_thermo_data(&mut self, data: f32) {
-            *self.remote_thermo = data;
-        }
-
-        pub fn get_thermo_data(& self) -> f32 {
-            *self.remote_thermo
+        SmartHouse {
+            name : own_name,
+            rooms,
+            remote_thermo
         }
     }
+
+    pub fn get_rooms(&self) -> Vec<&str> {
+        let mut result = Vec::new();
+        self.rooms.iter().for_each(|r| result.push(r.0.as_str()));
+        result
+    }
+
+    pub fn add_room(&mut self, room_name : &str) {
+        let room = Room { name: String::from(room_name), devices: HashMap::new() };
+        let room_name = String::from(room_name);
+        self.rooms.insert(room_name, room);
+    }
+
+    pub fn remove_room(&mut self, room_name : &str) -> Result<bool, SmartHouseError> {
+        let remove = self.rooms.remove(room_name);
+        match remove {
+            None => { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
+            Some(_) => { Ok(true) }
+        }
+    }
+
+    pub fn get_devices(&self, room_name: &str) -> Option<Vec<&str>> {
+        if !self.rooms.contains_key(room_name) { return None }
+        let room = self.rooms.get(room_name);
+        let devices = room
+            .map(|r| r.devices.keys()
+                .map(|k| k.as_str()).collect())
+            .unwrap();
+        Some(devices)
+    }
+
+    pub fn add_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
+        let rooms = &mut self.rooms;
+        let mut is_added = false;
+        rooms.iter_mut()
+            .filter(|r| r.1.name.eq(room_name))
+            .for_each(|r| {
+                if device_name.contains("Socket") {
+                    let device = SmartSocket { is_on: false, name: device_name.to_string() };
+                    r.1.devices.insert(device_name.to_string(), Box::new(device));
+                    is_added = true;
+                } else if device_name.contains("Thermo") {
+                    let device = SmartThermometer { is_on: false, name: device_name.to_string()};
+                    r.1.devices.insert(device_name.to_string(), Box::new(device));
+                    is_added = true;
+                };
+        });
+        if is_added { Ok (true) }
+        else { Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR)) }
+    }
+
+    pub fn remove_device(&mut self, room_name: &str, device_name: &str) -> Result<bool, SmartHouseError> {
+        let rooms = &mut self.rooms;
+        if !rooms.contains_key(room_name) {
+            return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))
+        }
+        for r in rooms {
+            if r.0.eq(room_name) {
+                let room = r.1;
+                room.devices.remove(device_name);
+                return Ok(true)
+            }
+        }
+        Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
+    }
+
+    pub fn create_report(
+        &self,
+        /* todo: принять обобщённый тип предоставляющий информацию об устройствах */
+        device_info_provider : &dyn DeviceInfoProvider,
+        room_name : &str,
+        device_name : &str
+    ) -> Result <String, SmartHouseError, > {
+        // todo!("перебор комнат и устройств в них для составления отчёта")
+        device_info_provider.get_device_state(room_name, device_name)
+    }
+
+    pub fn switch_socket(&mut self, room_name: &str, device_name : &str, state : bool)
+        -> Result<bool, SmartHouseError>
+    {
+        let room_opt = self.rooms.get_mut(room_name);
+        let room: &mut Room;
+
+        match room_opt {
+            Some(..) => { room = room_opt.unwrap() },
+            None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
+        };
+
+        let device_opt = room.devices.get_mut(device_name);
+
+        match device_opt {
+            Some(dev) => {
+                dev.switch_on_off(state);
+                Ok(true)
+            },
+            None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
+        }
+    }
+
+    pub fn get_socket_state(&mut self, room_name: &str, device_name : &str)
+        -> Result<f32, SmartHouseError>
+    {
+        let room_opt = self.rooms.get_mut(room_name);
+        let room: &mut Room;
+
+        match room_opt {
+            Some(..) => { room = room_opt.unwrap() },
+            None => { return Err(SmartHouseError::WrongRequestDataError(ROOM_ERROR))}
+        };
+
+        let device_opt = room.devices.get_mut(device_name);
+
+        match device_opt {
+            Some(dev) => {
+                let power = dev.get_consumed_power(device_name);
+                Ok(power)
+            },
+            None => Err(SmartHouseError::WrongRequestDataError(DEVICE_ERROR))
+        }
+    }
+
+    pub fn set_thermo_data(&mut self, data: f32) {
+        *self.remote_thermo = data;
+    }
+
+    pub fn get_thermo_data(& self) -> f32 {
+        *self.remote_thermo
+    }
+}
 
 
 #[cfg(test)]

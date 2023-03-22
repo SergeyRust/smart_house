@@ -1,6 +1,4 @@
-
-use std::io::Error;
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::{Add, DerefMut};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::io;
@@ -57,7 +55,7 @@ impl AsyncServer {
                             println!("error while sending response : {}", send.err().unwrap());
                         }
                     }
-                    Err(e) => {println!("request failed with error: {e}")}
+                    Err(e) => { println!("request failed with error: {e}")}
                 }
             });
         }
@@ -78,7 +76,6 @@ impl AsyncServer {
                             .add(" switched successfully");
                         Ok(resp)
                     } else {
-                        let err = res.err().unwrap();
                         Err(SmartHouseError::CommandError(DeviceError::SocketError("could not switch socket")))
                     }
                 }
@@ -94,7 +91,7 @@ impl AsyncServer {
                         Err(SmartHouseError::CommandError(DeviceError::SocketError("could not get socket consumed")))
                     }
                 }
-                Err(e) => {
+                Err(_) => {
                     Err(ServerError("Could not parse command") )
                 }
             }

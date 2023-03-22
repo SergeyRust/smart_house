@@ -22,12 +22,12 @@ pub enum DeviceError {
 
 impl Display for DeviceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CommandError :{}", self.source().unwrap().description())
+        write!(f, "CommandError :{}", self.source().unwrap().to_string())
     }
 }
 
 impl Display for SmartHouseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SmartHouseError :{}", self.source().unwrap().description())
+        write!(f, "SmartHouseError :{}", self.source().unwrap().to_string())
     }
 }

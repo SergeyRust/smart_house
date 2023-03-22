@@ -1,6 +1,6 @@
-use clever_house::remote_server::RemoteServer;
-use clever_house::server::{Server};
-use clever_house::smart_house::SmartHouse;
+use smart_house::remote_server::RemoteServer;
+use smart_house::server::{Server};
+use smart_house::smart_house::SmartHouse;
 
 fn main() {
     let addr = "127.0.0.1:8081";
